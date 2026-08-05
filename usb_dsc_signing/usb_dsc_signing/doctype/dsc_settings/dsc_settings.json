@@ -1,0 +1,216 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:title",
+ "creation": "2026-08-04 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "helper_config_section",
+  "title",
+  "helper_url",
+  "request_timeout",
+  "column_break_config",
+  "enabled",
+  "allowed_doctypes_tab",
+  "allowed_doctypes_section",
+  "allowed_doctypes",
+  "signature_defaults_tab",
+  "signature_section",
+  "signature_reason",
+  "signature_location",
+  "column_break_sig",
+  "signature_box_page",
+  "signature_box_x",
+  "signature_box_y",
+  "signature_box_width",
+  "signature_box_height",
+  "logging_tab",
+  "logging_section",
+  "enable_debug_logging",
+  "max_log_days"
+ ],
+ "fields": [
+  {
+   "fieldname": "helper_config_section",
+   "fieldtype": "Section Break",
+   "label": "Helper Configuration"
+  },
+  {
+   "default": "DSC Settings",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Title",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "https://127.0.0.1:39999",
+   "description": "URL of the local DSC Signing Helper running on the user's Windows machine",
+   "fieldname": "helper_url",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Helper URL",
+   "reqd": 1
+  },
+  {
+   "default": "30",
+   "description": "Timeout in seconds for requests to the helper",
+   "fieldname": "request_timeout",
+   "fieldtype": "Int",
+   "label": "Request Timeout (seconds)",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_config",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Enable/Disable DSC signing functionality globally",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "allowed_doctypes_tab",
+   "fieldtype": "Tab Break",
+   "label": "Allowed Doctypes"
+  },
+  {
+   "fieldname": "allowed_doctypes_section",
+   "fieldtype": "Section Break",
+   "label": "Doctypes Where Sign Button Appears"
+  },
+  {
+   "description": "Select the DocTypes where the 'Digitally Sign PDF' button will appear",
+   "fieldname": "allowed_doctypes",
+   "fieldtype": "Table MultiSelect",
+   "label": "Allowed Doctypes",
+   "options": "DSC Allowed Doctype"
+  },
+  {
+   "fieldname": "signature_defaults_tab",
+   "fieldtype": "Tab Break",
+   "label": "Signature Defaults"
+  },
+  {
+   "fieldname": "signature_section",
+   "fieldtype": "Section Break",
+   "label": "Signature Configuration"
+  },
+  {
+   "default": "Digitally Signed",
+   "description": "Reason text embedded in the digital signature (visible in PDF readers)",
+   "fieldname": "signature_reason",
+   "fieldtype": "Data",
+   "label": "Signature Reason"
+  },
+  {
+   "default": "India",
+   "description": "Location text embedded in the digital signature",
+   "fieldname": "signature_location",
+   "fieldtype": "Data",
+   "label": "Signature Location"
+  },
+  {
+   "fieldname": "column_break_sig",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "PDF page number where the signature box is placed (1 = first page)",
+   "fieldname": "signature_box_page",
+   "fieldtype": "Int",
+   "label": "Signature Box Page",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "description": "X coordinate (in points, from left edge)",
+   "fieldname": "signature_box_x",
+   "fieldtype": "Int",
+   "label": "Signature Box X"
+  },
+  {
+   "default": "0",
+   "description": "Y coordinate (in points, from bottom edge)",
+   "fieldname": "signature_box_y",
+   "fieldtype": "Int",
+   "label": "Signature Box Y"
+  },
+  {
+   "default": "200",
+   "description": "Width of the visible signature box in points",
+   "fieldname": "signature_box_width",
+   "fieldtype": "Int",
+   "label": "Signature Box Width",
+   "non_negative": 1
+  },
+  {
+   "default": "50",
+   "description": "Height of the visible signature box in points",
+   "fieldname": "signature_box_height",
+   "fieldtype": "Int",
+   "label": "Signature Box Height",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "logging_tab",
+   "fieldtype": "Tab Break",
+   "label": "Logging"
+  },
+  {
+   "fieldname": "logging_section",
+   "fieldtype": "Section Break",
+   "label": "Logging Configuration"
+  },
+  {
+   "default": "0",
+   "description": "Enable detailed debug logging for DSC signing operations",
+   "fieldname": "enable_debug_logging",
+   "fieldtype": "Check",
+   "label": "Enable Debug Logging"
+  },
+  {
+   "default": "30",
+   "description": "Number of days to retain DSC signing logs",
+   "fieldname": "max_log_days",
+   "fieldtype": "Int",
+   "label": "Log Retention (days)",
+   "non_negative": 1
+  }
+ ],
+ "has_web_view": 0,
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-04 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "USB DSC Signing",
+ "name": "DSC Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "All",
+   "share": 1
+  }
+ ],
+ "quick_entry": 0,
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

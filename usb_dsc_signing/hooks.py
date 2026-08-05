@@ -25,8 +25,12 @@ app_license = "mit"
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/usb_dsc_signing/css/usb_dsc_signing.css"
-# app_include_js = "/assets/usb_dsc_signing/js/usb_dsc_signing.js"
+app_include_css = "/assets/usb_dsc_signing/css/signing_dialog.css"
+app_include_js = [
+	"/assets/usb_dsc_signing/js/helper_client.js",
+	"/assets/usb_dsc_signing/js/signing_dialog.js",
+	"/assets/usb_dsc_signing/js/si_button.js",
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/usb_dsc_signing/css/usb_dsc_signing.css"
@@ -86,7 +90,7 @@ app_license = "mit"
 # ------------
 
 # before_install = "usb_dsc_signing.install.before_install"
-# after_install = "usb_dsc_signing.install.after_install"
+after_install = "usb_dsc_signing.usb_dsc_signing.install.after_install"
 
 # Uninstallation
 # ------------
