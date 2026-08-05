@@ -25,12 +25,11 @@ app_license = "mit"
 # ------------------
 
 # include js, css files in header of desk.html
-app_include_css = "/assets/usb_dsc_signing/css/signing_dialog.css"
-app_include_js = [
-	"/assets/usb_dsc_signing/js/helper_client.js",
-	"/assets/usb_dsc_signing/js/signing_dialog.js",
-	"/assets/usb_dsc_signing/js/si_button.js",
-]
+# Bundled (not raw /assets paths) so bench build content-hashes the output
+# filename on every rebuild -- raw paths never change URL across deploys,
+# so browsers/CDNs can keep serving a stale cached copy indefinitely.
+app_include_css = "usb_dsc_signing.bundle.css"
+app_include_js = "usb_dsc_signing.bundle.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/usb_dsc_signing/css/usb_dsc_signing.css"
