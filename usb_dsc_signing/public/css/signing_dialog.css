@@ -173,6 +173,27 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Print Format Selection
+   --------------------------------------------------------------------------- */
+
+.dsc-print-format-selection {
+	margin-bottom: 16px;
+	max-width: 320px;
+}
+
+.dsc-print-format-label {
+	display: block;
+	margin-bottom: 6px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-color, #1a202c);
+}
+
+.dsc-print-format-select {
+	width: 100%;
+}
+
+/* ---------------------------------------------------------------------------
    Loading Spinner
    --------------------------------------------------------------------------- */
 

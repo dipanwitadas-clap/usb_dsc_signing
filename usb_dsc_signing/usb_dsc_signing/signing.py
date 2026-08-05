@@ -49,9 +49,9 @@ class SigningStateError(Exception):
     """Raised when a signing session is missing, expired, or invalid."""
 
 
-def get_document_pdf(doctype: str, docname: str) -> bytes:
-    """Render the PDF for a given ERPNext document via the standard print format."""
-    html = frappe.get_print(doctype, docname, print_format="Standard")
+def get_document_pdf(doctype: str, docname: str, print_format: str | None = None) -> bytes:
+    """Render the PDF for a given ERPNext document via the configured print format."""
+    html = frappe.get_print(doctype, docname, print_format=print_format or "Standard")
     pdf_bytes = frappe.utils.pdf.get_pdf(html)
 
     if not pdf_bytes:

@@ -64,6 +64,7 @@ def prepare_for_signing(
     certificate_pem: str,
     certificate_serial: str | None = None,
     chain_pem: str | list | None = None,
+    print_format: str | None = None,
 ) -> dict:
     """Phase 1: build the CMS-to-be-signed structure for the selected certificate.
 
@@ -82,6 +83,8 @@ def prepare_for_signing(
             checks against the /sign response later.
         chain_pem: Optional list of intermediate/root certificate PEMs, from
             the same certificate entry.
+        print_format: Print Format the user picked in the browser (same list
+            Frappe's own print view offers). Defaults to "Standard".
 
     Returns:
         dict with keys:
@@ -96,7 +99,7 @@ def prepare_for_signing(
     chain_pem_list = _coerce_list(chain_pem)
 
     try:
-        pdf_bytes = get_document_pdf(doctype, docname)
+        pdf_bytes = get_document_pdf(doctype, docname, print_format=print_format)
         result = begin_signature(
             pdf_bytes=pdf_bytes,
             certificate_pem=certificate_pem,

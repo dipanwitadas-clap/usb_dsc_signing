@@ -4,10 +4,11 @@
  * Orchestrates the full signing flow:
  *   1. Check DSC Helper status  (GET /info)
  *   2. Select certificate        (from /info response or GET /certificates)
- *   3. Generate PDF + hash       (frappe.call → prepare_for_signing)
- *   4. Sign hash                 (POST /sign)
- *   5. Embed signature           (frappe.call → save_signed_pdf)
- *   6. Show result / download
+ *   3. Select print format       (same list as Frappe's own print view)
+ *   4. Generate PDF + hash       (frappe.call → prepare_for_signing)
+ *   5. Sign hash                 (POST /sign)
+ *   6. Embed signature           (frappe.call → complete_signing)
+ *   7. Show result / download
  *
  * The DSC helper is treated as a black-box external service.
  * We never prompt for a PIN — the vendor CSP handles that automatically.
@@ -35,6 +36,7 @@ frappe.provide('dsc');
 		this.doctype = opts.doctype;
 		this.docname = opts.docname;
 		this.selectedCert = null;
+		this.selectedPrintFormat = null;
 		this.sessionId = null;
 		this.tbsHashHex = null;
 		this.hashAlgorithm = 'SHA-256';
@@ -89,7 +91,7 @@ frappe.provide('dsc');
 		},
 
 		/**
-		 * Step 1 → Step 2 → Step 3 → Step 4 → Step 5 → Step 6
+		 * Step 1 → Step 2 → Step 3 → Step 4 → Step 5 → Step 6 → Step 7
 		 * Each step calls _nextStep internally on success.
 		 */
 		_startFlow: function () {
@@ -115,12 +117,14 @@ frappe.provide('dsc');
 				case 2:
 					return this._stepSelectCertificate();
 				case 3:
-					return this._stepGeneratePdf();
+					return this._stepSelectPrintFormat();
 				case 4:
-					return this._stepSignHash();
+					return this._stepGeneratePdf();
 				case 5:
-					return this._stepEmbedSignature();
+					return this._stepSignHash();
 				case 6:
+					return this._stepEmbedSignature();
+				case 7:
 					return this._stepDone();
 				default:
 					break;
@@ -247,7 +251,7 @@ frappe.provide('dsc');
 
 			// Change the footer to show Continue
 			self._hideRetryButton();
-			var footer = self.dialog.footer;
+			var footer = self.dialog.footer.get(0);
 			footer.innerHTML = '';
 
 			var continueBtn = document.createElement('button');
@@ -286,15 +290,90 @@ frappe.provide('dsc');
 		},
 
 		// -------------------------------------------------------------------
-		// Step 3 – Generate PDF & compute hash
+		// Step 3 – Select Print Format
+		// -------------------------------------------------------------------
+
+		/**
+		 * Same print format list Frappe's own print preview offers for this
+		 * DocType (frappe.model.get_print_formats), so whatever the user
+		 * would normally print is available to sign too.
+		 */
+		_stepSelectPrintFormat: function () {
+			this._markStepActive(3);
+			this._setStatus(__('Choose the print format to sign:'), 'info');
+			this._renderPrintFormatSelection();
+		},
+
+		_renderPrintFormatSelection: function () {
+			var self = this;
+			var body = this.dialog.body;
+
+			var formats = [];
+			try {
+				formats = frappe.model.get_print_formats(this.doctype) || [];
+			} catch (_e) {
+				formats = ['Standard'];
+			}
+			if (!formats.length) {
+				formats = ['Standard'];
+			}
+
+			var selDiv = document.createElement('div');
+			selDiv.className = 'dsc-print-format-selection';
+
+			var label = document.createElement('label');
+			label.className = 'dsc-print-format-label';
+			label.textContent = __('Print Format');
+			selDiv.appendChild(label);
+
+			var select = document.createElement('select');
+			select.className = 'form-control dsc-print-format-select';
+			formats.forEach(function (fmt) {
+				var option = document.createElement('option');
+				option.value = fmt;
+				option.textContent = fmt;
+				select.appendChild(option);
+			});
+			selDiv.appendChild(select);
+
+			var old = body.querySelector('.dsc-print-format-selection');
+			if (old) old.remove();
+			body.appendChild(selDiv);
+
+			this._hideRetryButton();
+			var footer = this.dialog.footer.get(0);
+			footer.innerHTML = '';
+
+			var continueBtn = document.createElement('button');
+			continueBtn.className = 'btn btn-primary btn-sm';
+			continueBtn.textContent = __('Continue');
+			continueBtn.addEventListener('click', function () {
+				self.selectedPrintFormat = select.value;
+				if (selDiv) selDiv.remove();
+				self._markStepDone(3, __('Format: {0}', [self.selectedPrintFormat]));
+				self._nextStep();
+			});
+			footer.appendChild(continueBtn);
+
+			var cancelBtn = document.createElement('button');
+			cancelBtn.className = 'btn btn-default btn-sm ml-2';
+			cancelBtn.textContent = __('Cancel');
+			cancelBtn.addEventListener('click', function () {
+				self.abort();
+			});
+			footer.appendChild(cancelBtn);
+		},
+
+		// -------------------------------------------------------------------
+		// Step 4 – Generate PDF & compute hash
 		// -------------------------------------------------------------------
 
 		_stepGeneratePdf: function () {
-			this._markStepActive(3);
+			this._markStepActive(4);
 			this._setStatus(__('Generating PDF and preparing signature...'), 'info', true);
 
 			if (!this.selectedCert || !this.selectedCert.pem) {
-				this._markStepError(3);
+				this._markStepError(4);
 				this._setStatus(
 					__('The DSC Helper did not return certificate data (PEM) for the selected certificate. Cannot proceed.'),
 					'error'
@@ -310,6 +389,7 @@ frappe.provide('dsc');
 					certificate_pem: this.selectedCert.pem,
 					certificate_serial: this.selectedCert.serial_number || null,
 					chain_pem: this.selectedCert.chain_pem || [],
+					print_format: this.selectedPrintFormat || 'Standard',
 				})
 				.then(function (r) {
 					if (self._aborted) return;
@@ -317,12 +397,12 @@ frappe.provide('dsc');
 					self.sessionId = data.session_id;
 					self.tbsHashHex = data.tbs_hash_hex;
 					self.hashAlgorithm = data.hash_algorithm || 'SHA-256';
-					self._markStepDone(3);
+					self._markStepDone(4);
 					self._nextStep();
 				})
 				.catch(function (err) {
 					if (self._aborted) return;
-					self._markStepError(3);
+					self._markStepError(4);
 					self._setStatus(
 						__('Failed to generate PDF: {0}', [err.message || String(err)]),
 						'error'
@@ -331,11 +411,11 @@ frappe.provide('dsc');
 		},
 
 		// -------------------------------------------------------------------
-		// Step 4 – Sign hash via helper
+		// Step 5 – Sign hash via helper
 		// -------------------------------------------------------------------
 
 		_stepSignHash: function () {
-			this._markStepActive(4);
+			this._markStepActive(5);
 			this._setStatus(
 				__('Signing... If this is your first sign, the PIN dialog will appear. Please enter your PIN in the vendor dialog.'),
 				'info',
@@ -356,12 +436,12 @@ frappe.provide('dsc');
 				.then(function (signResult) {
 					if (self._aborted) return;
 					self.signResult = signResult;
-					self._markStepDone(4);
+					self._markStepDone(5);
 					self._nextStep();
 				})
 				.catch(function (err) {
 					if (self._aborted) return;
-					self._markStepError(4);
+					self._markStepError(5);
 					var msg = err.message || String(err);
 					// Friendly message for common errors
 					if (msg.indexOf('AbortError') !== -1 || msg.indexOf('timed out') !== -1) {
@@ -369,17 +449,17 @@ frappe.provide('dsc');
 					}
 					self._setStatus(__('Signing failed: {0}', [msg]), 'error');
 					self._showRetryButton(function () {
-						self._goToStep(4);
+						self._goToStep(5);
 					});
 				});
 		},
 
 		// -------------------------------------------------------------------
-		// Step 5 – Embed signature into PDF
+		// Step 6 – Embed signature into PDF
 		// -------------------------------------------------------------------
 
 		_stepEmbedSignature: function () {
-			this._markStepActive(5);
+			this._markStepActive(6);
 			this._setStatus(__('Embedding digital signature into PDF...'), 'info', true);
 
 			var self = this;
@@ -393,12 +473,12 @@ frappe.provide('dsc');
 					if (self._aborted) return;
 					self.signedResult = r.message;
 					self.signedFileUrl = r.message.file_url;
-					self._markStepDone(5);
+					self._markStepDone(6);
 					self._nextStep();
 				})
 				.catch(function (err) {
 					if (self._aborted) return;
-					self._markStepError(5);
+					self._markStepError(6);
 					self._setStatus(
 						__('Failed to embed signature: {0}', [err.message || String(err)]),
 						'error'
@@ -407,11 +487,12 @@ frappe.provide('dsc');
 		},
 
 		// -------------------------------------------------------------------
-		// Step 6 – Done
+		// Step 7 – Done
 		// -------------------------------------------------------------------
 
 		_stepDone: function () {
-			this._markStepDone(6);
+			var self = this;
+			this._markStepDone(7);
 			this._setStatus(
 				__('✔ Document Signed Successfully by {0} on {1}', [
 					this.signedResult.signed_by || __('Unknown'),
@@ -421,7 +502,7 @@ frappe.provide('dsc');
 			);
 
 			// Replace footer with action buttons
-			var footer = this.dialog.footer;
+			var footer = this.dialog.footer.get(0);
 			footer.innerHTML = '';
 
 			var viewBtn = document.createElement('button');
@@ -449,7 +530,6 @@ frappe.provide('dsc');
 			});
 			footer.appendChild(downloadBtn);
 
-			var self = this;
 			var closeBtn = document.createElement('button');
 			closeBtn.className = 'btn btn-default btn-sm ml-2';
 			closeBtn.textContent = __('Close');
@@ -485,7 +565,7 @@ frappe.provide('dsc');
 			this._buildLoadingArea();
 		},
 
-		/** Six-step indicator: [1:Helper] [2:Cert] [3:PDF] [4:Sign] [5:Embed] [6:Done] */
+		/** Seven-step indicator: [1:Helper] [2:Cert] [3:Format] [4:PDF] [5:Sign] [6:Embed] [7:Done] */
 		_buildStepIndicator: function () {
 			var stepsDiv = document.createElement('div');
 			stepsDiv.className = 'dsc-steps';
@@ -493,6 +573,7 @@ frappe.provide('dsc');
 			var stepNames = [
 				__('Check Helper'),
 				__('Certificate'),
+				__('Print Format'),
 				__('Generate PDF'),
 				__('Sign'),
 				__('Embed'),
@@ -574,7 +655,7 @@ frappe.provide('dsc');
 		},
 
 		_showRetryButton: function (cb) {
-			var footer = this.dialog.footer;
+			var footer = this.dialog.footer.get(0);
 			footer.innerHTML = '';
 
 			var retryBtn = document.createElement('button');
