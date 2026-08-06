@@ -295,7 +295,7 @@ frappe.provide('dsc');
 
 		/**
 		 * Same print format list Frappe's own print preview offers for this
-		 * DocType (frappe.model.get_print_formats), so whatever the user
+		 * DocType (frappe.meta.get_print_formats), so whatever the user
 		 * would normally print is available to sign too.
 		 */
 		_stepSelectPrintFormat: function () {
@@ -310,7 +310,7 @@ frappe.provide('dsc');
 
 			var formats = [];
 			try {
-				formats = frappe.model.get_print_formats(this.doctype) || [];
+				formats = frappe.meta.get_print_formats(this.doctype) || [];
 			} catch (_e) {
 				formats = ['Standard'];
 			}
