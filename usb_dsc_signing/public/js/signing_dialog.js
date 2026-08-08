@@ -199,7 +199,8 @@ frappe.provide('dsc');
 			if (certs.length === 1) {
 				// Auto-select
 				this.selectedCert = certs[0];
-				this._markStepDone(2, __('Auto-selected: {0}', [this._certDisplay(this.selectedCert)]));
+				this._markStepDone(2, __('Auto-selected'));
+				this._renderCertSummary(this.selectedCert);
 				this._nextStep();
 				return;
 			}
@@ -210,12 +211,128 @@ frappe.provide('dsc');
 			this._renderCertSelection(certs);
 		},
 
-		_certDisplay: function (cert) {
+		/**
+		 * Certificate subject/issuer come from the DSC helper as raw
+		 * RFC-2253-ish DN strings (e.g. "CN=John Doe,1.2.840.113549.1.9.1=
+		 * john@x.com,2.5.4.5=...,O=Personal,C=IN"). Parse out the handful
+		 * of fields worth showing a human instead of dumping the whole DN.
+		 */
+		_splitDN: function (dn) {
 			var parts = [];
-			if (cert.subject) parts.push(cert.subject);
-			if (cert.issuer) parts.push(__('Issuer: {0}', [cert.issuer]));
-			if (cert.not_after) parts.push(__('Expires: {0}', [cert.not_after]));
-			return parts.join(' | ');
+			var current = '';
+			for (var i = 0; i < dn.length; i++) {
+				var ch = dn[i];
+				if (ch === '\\' && i + 1 < dn.length) {
+					current += ch + dn[i + 1];
+					i++;
+					continue;
+				}
+				if (ch === ',') {
+					parts.push(current);
+					current = '';
+					continue;
+				}
+				current += ch;
+			}
+			if (current) parts.push(current);
+			return parts;
+		},
+
+		_parseDN: function (dn) {
+			var result = {};
+			if (!dn) return result;
+			this._splitDN(dn).forEach(function (part) {
+				var idx = part.indexOf('=');
+				if (idx === -1) return;
+				var key = part.slice(0, idx).trim();
+				var value = part
+					.slice(idx + 1)
+					.trim()
+					.replace(/\\,/g, ',')
+					.replace(/\\\\/g, '\\');
+				if (key && !(key in result)) {
+					result[key] = value;
+				}
+			});
+			return result;
+		},
+
+		_formatDate: function (isoStr) {
+			if (!isoStr) return '';
+			try {
+				if (window.moment) {
+					return moment(isoStr).format('DD MMM YYYY');
+				}
+				return new Date(isoStr).toLocaleDateString();
+			} catch (_e) {
+				return isoStr;
+			}
+		},
+
+		/** Pull just Name / Email / Issuer / Expiry out of the raw cert DNs. */
+		_certFriendly: function (cert) {
+			var subject = this._parseDN(cert.subject || '');
+			var issuer = this._parseDN(cert.issuer || '');
+			var email = subject['1.2.840.113549.1.9.1'] || subject.E || subject.emailAddress || '';
+			return {
+				name: subject.CN || __('Unknown'),
+				email: email,
+				issuerName: issuer.CN || '',
+				issuerOrg: issuer.O || '',
+				expires: cert.not_after || '',
+			};
+		},
+
+		/** Short one-line label, e.g. "John Doe <john@x.com> — expires 02 Apr 2029" */
+		_certDisplay: function (cert) {
+			var f = this._certFriendly(cert);
+			var line = f.email ? f.name + ' <' + f.email + '>' : f.name;
+			if (f.expires) {
+				line += ' — ' + __('expires {0}', [this._formatDate(f.expires)]);
+			}
+			return line;
+		},
+
+		/** Renders a compact, persistent summary card for the chosen certificate. */
+		_renderCertSummary: function (cert) {
+			var body = this.dialog.body;
+			var old = body.querySelector('.dsc-cert-summary');
+			if (old) old.remove();
+
+			var f = this._certFriendly(cert);
+			var card = document.createElement('div');
+			card.className = 'dsc-cert-summary';
+
+			var rows = [
+				[__('Signer'), f.email ? f.name + ' <' + f.email + '>' : f.name],
+				[__('Issued By'), [f.issuerName, f.issuerOrg].filter(Boolean).join(', ')],
+				[__('Valid Until'), this._formatDate(f.expires)],
+			];
+
+			rows.forEach(function (row) {
+				if (!row[1]) return;
+				var rowDiv = document.createElement('div');
+				rowDiv.className = 'dsc-cert-summary-row';
+
+				var keyEl = document.createElement('span');
+				keyEl.className = 'dsc-cert-summary-key';
+				keyEl.textContent = row[0];
+
+				var valEl = document.createElement('span');
+				valEl.className = 'dsc-cert-summary-value';
+				valEl.textContent = row[1];
+
+				rowDiv.appendChild(keyEl);
+				rowDiv.appendChild(valEl);
+				card.appendChild(rowDiv);
+			});
+
+			var loaderEl = body.querySelector('.dsc-loader');
+			if (loaderEl) {
+				body.insertBefore(card, loaderEl);
+			} else {
+				body.appendChild(card);
+			}
 		},
 
 		_renderCertSelection: function (certs) {
@@ -275,7 +392,8 @@ frappe.provide('dsc');
 
 				// Clean up selection UI
 				if (selDiv) selDiv.remove();
-				self._markStepDone(2, __('Selected: {0}', [self._certDisplay(self.selectedCert)]));
+				self._markStepDone(2, __('Selected'));
+				self._renderCertSummary(self.selectedCert);
 				self._nextStep();
 			});
 			footer.appendChild(continueBtn);
