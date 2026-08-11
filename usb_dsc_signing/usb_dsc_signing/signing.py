@@ -148,8 +148,10 @@ def begin_signature(
 
     from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
     from pyhanko.sign import fields
+    from pyhanko.sign.signers.constants import SIG_DETAILS_DEFAULT_TEMPLATE
     from pyhanko.sign.signers.pdf_cms import ExternalSigner
     from pyhanko.sign.signers.pdf_signer import PdfSignatureMetadata, PdfSigner
+    from pyhanko.stamp import TextStampStyle
     from pyhanko_certvalidator.registry import SimpleCertificateStore
 
     if not certificate_pem:
@@ -194,7 +196,14 @@ def begin_signature(
         contact_info=contact_info or None,
         subfilter=fields.SigSeedSubFilter.PADES,
     )
-    pdf_signer = PdfSigner(sig_meta, signer=prelim_signer, new_field_spec=sig_field)
+    # Plain text stamp, no decorative background art — pyHanko's default
+    # stamp style overlays its own placeholder logo/watermark graphic,
+    # which gets cropped/distorted in a box this small and looks out of
+    # place on a business document.
+    stamp_style = TextStampStyle(stamp_text=SIG_DETAILS_DEFAULT_TEMPLATE, background=None)
+    pdf_signer = PdfSigner(
+        sig_meta, signer=prelim_signer, new_field_spec=sig_field, stamp_style=stamp_style
+    )
 
     writer = IncrementalPdfFileWriter(io.BytesIO(pdf_bytes))
 
