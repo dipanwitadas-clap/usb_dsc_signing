@@ -138,10 +138,10 @@ def _wrap_to_width(text: str, col_width_pt: int, font_size: int, avg_char_width:
     return "\n".join(lines) or text
 
 
-def _adobe_style_timestamp() -> str:
-    """'YYYY.MM.DD HH:MM:SS +HH'MM'' in the site's configured timezone (never
-    hardcoded to a specific region — this app is meant to run in any country).
-    Falls back to UTC if the configured zone name is invalid."""
+def _adobe_style_timestamp() -> tuple[str, str]:
+    """('YYYY.MM.DD', 'HH:MM:SS +HH'MM'') in the site's configured timezone
+    (never hardcoded to a specific region — this app is meant to run in any
+    country). Falls back to UTC if the configured zone name is invalid."""
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
     tz_name = frappe.utils.get_system_timezone()
@@ -153,7 +153,9 @@ def _adobe_style_timestamp() -> str:
     now = datetime.now(tz)
     offset = now.strftime("%z")  # e.g. '+0530', '-0400', or '' if naive
     offset_str = f"{offset[0]}{offset[1:3]}'{offset[3:5]}'" if offset else ""
-    return f"{now.strftime('%Y.%m.%d %H:%M:%S')} {offset_str}".strip()
+    date_part = now.strftime("%Y.%m.%d")
+    time_part = f"{now.strftime('%H:%M:%S')} {offset_str}".strip()
+    return date_part, time_part
 
 
 def _build_signature_stamp_style(signer_name: str):
@@ -198,8 +200,9 @@ def _build_signature_stamp_style(signer_name: str):
         box_layout_rule=left_align_mid,
     )
 
-    timestamp_text = _adobe_style_timestamp()
-    left_fraction = 0.38
+    timestamp_date, timestamp_time = _adobe_style_timestamp()
+    left_fraction = 0.40
+    gap_fraction = 0.20
 
     @dataclass(frozen=True)
     class _TwoColumnStampStyle(BaseStampStyle):
@@ -210,7 +213,8 @@ def _build_signature_stamp_style(signer_name: str):
         def _render_inner_content(self):
             bbox = self.box
             left_width = int(bbox.width * left_fraction)
-            right_width = bbox.width - left_width
+            gap_width = int(bbox.width * gap_fraction)
+            right_width = bbox.width - left_width - gap_width
 
             name_box = TextBox(
                 name_style,
@@ -230,13 +234,16 @@ def _build_signature_stamp_style(signer_name: str):
                 box=layout.BoxConstraints(width=right_width, height=bbox.height),
                 font_name="F2",
             )
-            detail_box.content = f"Digitally signed by {signer_name}\nDate: {timestamp_text}"
+            detail_box.content = (
+                f"Digitally signed by\n{signer_name}\n"
+                f"Date: {timestamp_date}\nTime: {timestamp_time}"
+            )
 
             return [
                 b"q 1 0 0 1 0 0 cm",
                 name_box.render(),
                 b"Q",
-                b"q 1 0 0 1 %g 0 cm" % left_width,
+                b"q 1 0 0 1 %g 0 cm" % (left_width + gap_width),
                 detail_box.render(),
                 b"Q",
             ]
