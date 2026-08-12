@@ -119,6 +119,129 @@ class SignatureBoxSpec:
     height: int
 
 
+def _wrap_to_width(text: str, col_width_pt: int, font_size: int, avg_char_width: float) -> str:
+    """Greedy word-wrap so a name fits a fixed-width column (pyHanko text
+    boxes don't wrap on their own — see pyhanko.pdf_utils.text.TextBox)."""
+    chars_per_line = max(1, int(col_width_pt / (max(font_size, 1) * avg_char_width)))
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if len(candidate) > chars_per_line and current:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return "\n".join(lines) or text
+
+
+def _adobe_style_timestamp() -> str:
+    """'YYYY.MM.DD HH:MM:SS +HH'MM'' in the site's configured timezone (never
+    hardcoded to a specific region — this app is meant to run in any country).
+    Falls back to UTC if the configured zone name is invalid."""
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    tz_name = frappe.utils.get_system_timezone()
+    try:
+        tz = ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        tz = ZoneInfo("UTC")
+
+    now = datetime.now(tz)
+    offset = now.strftime("%z")  # e.g. '+0530', '-0400', or '' if naive
+    offset_str = f"{offset[0]}{offset[1:3]}'{offset[3:5]}'" if offset else ""
+    return f"{now.strftime('%Y.%m.%d %H:%M:%S')} {offset_str}".strip()
+
+
+def _build_signature_stamp_style(signer_name: str):
+    """Two-column visible-signature stamp: big signer name on the left,
+    a 'Digitally signed by / Date' block on the right, no vendor watermark
+    art and no email — modelled on the classic Adobe Acrobat appearance.
+
+    pyHanko's own default stamp (``TextStampStyle`` with the built-in
+    ``STAMP_ART_CONTENT`` background, see ``pyhanko.sign.signers.constants``)
+    only supports a single font/size for the whole box, which can't produce
+    a big-name/small-details layout — so this subclasses the low-level
+    ``BaseStampStyle``/``BaseStamp`` extension points instead (see
+    ``pyhanko.stamp.base``) and lays out two independent text boxes by hand.
+    """
+    from pyhanko.pdf_utils import layout
+    from pyhanko.pdf_utils.font.basic import SimpleFontEngineFactory
+    from pyhanko.pdf_utils.text import TextBox, TextBoxStyle
+    from pyhanko.stamp.base import BaseStamp, BaseStampStyle
+
+    name_font_size = 13
+    name_avg_width = 0.56  # Helvetica-Bold, fraction of font size per char
+    detail_font_size = 7
+
+    left_align_mid = layout.SimpleBoxLayoutRule(
+        x_align=layout.AxisAlignment.ALIGN_MIN,
+        y_align=layout.AxisAlignment.ALIGN_MID,
+        margins=layout.Margins(left=8, right=4, top=2, bottom=2),
+    )
+
+    name_style = TextBoxStyle(
+        font=SimpleFontEngineFactory("Helvetica-Bold", name_avg_width),
+        font_size=name_font_size,
+        leading=name_font_size + 1,
+        box_layout_rule=left_align_mid,
+    )
+    detail_style = TextBoxStyle(
+        font=SimpleFontEngineFactory("Helvetica", 0.5),
+        font_size=detail_font_size,
+        leading=detail_font_size + 2,
+        box_layout_rule=left_align_mid,
+    )
+
+    timestamp_text = _adobe_style_timestamp()
+    left_fraction = 0.38
+
+    @dataclass(frozen=True)
+    class _TwoColumnStampStyle(BaseStampStyle):
+        def create_stamp(self, writer, box, text_params):
+            return _TwoColumnStamp(writer=writer, style=self, box=box)
+
+    class _TwoColumnStamp(BaseStamp):
+        def _render_inner_content(self):
+            bbox = self.box
+            left_width = int(bbox.width * left_fraction)
+            right_width = bbox.width - left_width
+
+            name_box = TextBox(
+                name_style,
+                writer=self.writer,
+                resources=self.resources,
+                box=layout.BoxConstraints(width=left_width, height=bbox.height),
+                font_name="F1",
+            )
+            name_box.content = _wrap_to_width(
+                signer_name, left_width, name_font_size, name_avg_width
+            )
+
+            detail_box = TextBox(
+                detail_style,
+                writer=self.writer,
+                resources=self.resources,
+                box=layout.BoxConstraints(width=right_width, height=bbox.height),
+                font_name="F2",
+            )
+            detail_box.content = f"Digitally signed by {signer_name}\nDate: {timestamp_text}"
+
+            return [
+                b"q 1 0 0 1 0 0 cm",
+                name_box.render(),
+                b"Q",
+                b"q 1 0 0 1 %g 0 cm" % left_width,
+                detail_box.render(),
+                b"Q",
+            ]
+
+    return _TwoColumnStampStyle()
+
+
 def begin_signature(
     *,
     pdf_bytes: bytes,
@@ -148,10 +271,8 @@ def begin_signature(
 
     from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
     from pyhanko.sign import fields
-    from pyhanko.sign.signers.constants import SIG_DETAILS_DEFAULT_TEMPLATE
     from pyhanko.sign.signers.pdf_cms import ExternalSigner
     from pyhanko.sign.signers.pdf_signer import PdfSignatureMetadata, PdfSigner
-    from pyhanko.stamp import TextStampStyle
     from pyhanko_certvalidator.registry import SimpleCertificateStore
 
     if not certificate_pem:
@@ -167,6 +288,7 @@ def begin_signature(
         frappe.throw(frappe._("Could not parse the signing certificate (PEM)."))
     leaf_cert = leaf_certs[0]
     asn1_leaf = _to_asn1_cert(leaf_cert)
+    signed_by = _extract_common_name(leaf_cert)
 
     registry = SimpleCertificateStore()
     registry.register(asn1_leaf)
@@ -190,17 +312,18 @@ def begin_signature(
     )
     sig_meta = PdfSignatureMetadata(
         field_name="DSCSignature",
+        name=signed_by,
         md_algorithm=DIGEST_ALGORITHM,
         reason=reason or None,
         location=location or None,
         contact_info=contact_info or None,
         subfilter=fields.SigSeedSubFilter.PADES,
     )
-    # Plain text stamp, no decorative background art — pyHanko's default
-    # stamp style overlays its own placeholder logo/watermark graphic,
-    # which gets cropped/distorted in a box this small and looks out of
-    # place on a business document.
-    stamp_style = TextStampStyle(stamp_text=SIG_DETAILS_DEFAULT_TEMPLATE, background=None)
+    # Two-column Adobe-style stamp (name + "Digitally signed by / Date"),
+    # no decorative background art and no email — see
+    # _build_signature_stamp_style() for why pyHanko's default TextStampStyle
+    # isn't enough on its own.
+    stamp_style = _build_signature_stamp_style(signed_by)
     pdf_signer = PdfSigner(
         sig_meta, signer=prelim_signer, new_field_spec=sig_field, stamp_style=stamp_style
     )
@@ -226,7 +349,6 @@ def begin_signature(
     signed_attrs_der = signed_attrs.dump()
     tbs_hash_hex = _sha256_hex(signed_attrs_der)
 
-    signed_by = _extract_common_name(leaf_cert)
     state = {
         "intermediate_pdf": out_stream.getvalue(),
         "document_digest": prepared_br_digest.document_digest,

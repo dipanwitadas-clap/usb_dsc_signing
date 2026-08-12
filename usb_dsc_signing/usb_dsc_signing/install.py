@@ -24,7 +24,7 @@ def _create_default_settings():
 		settings.signature_box_page = 1
 		settings.signature_box_x = 0
 		settings.signature_box_y = 0
-		settings.signature_box_width = 200
+		settings.signature_box_width = 320
 		settings.signature_box_height = 50
 		settings.enable_debug_logging = 0
 		settings.max_log_days = 30

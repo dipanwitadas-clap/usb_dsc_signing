@@ -142,7 +142,7 @@
    "label": "Signature Box Y"
   },
   {
-   "default": "200",
+   "default": "320",
    "description": "Width of the visible signature box in points",
    "fieldname": "signature_box_width",
    "fieldtype": "Int",
