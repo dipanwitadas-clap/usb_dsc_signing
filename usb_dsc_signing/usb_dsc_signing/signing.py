@@ -173,8 +173,8 @@ def _build_signature_stamp_style(signer_name: str):
     from pyhanko.pdf_utils.text import TextBox, TextBoxStyle
     from pyhanko.stamp.base import BaseStamp, BaseStampStyle
 
-    name_font_size = 15
-    name_avg_width = 0.56  # Helvetica-Bold, fraction of font size per char
+    name_font_size = 18
+    name_avg_width = 0.5  # Helvetica (regular), fraction of font size per char
     detail_font_size = 8
 
     left_align_mid = layout.SimpleBoxLayoutRule(
@@ -184,9 +184,11 @@ def _build_signature_stamp_style(signer_name: str):
     )
 
     name_style = TextBoxStyle(
-        font=SimpleFontEngineFactory("Helvetica-Bold", name_avg_width),
+        # Regular weight, not bold — a bigger size (not heavier strokes) is
+        # what makes the name read as prominent, matching the reference.
+        font=SimpleFontEngineFactory("Helvetica", name_avg_width),
         font_size=name_font_size,
-        leading=name_font_size + 1,
+        leading=name_font_size + 2,
         box_layout_rule=left_align_mid,
     )
     detail_style = TextBoxStyle(
