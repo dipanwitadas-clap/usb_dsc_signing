@@ -173,14 +173,14 @@ def _build_signature_stamp_style(signer_name: str):
     from pyhanko.pdf_utils.text import TextBox, TextBoxStyle
     from pyhanko.stamp.base import BaseStamp, BaseStampStyle
 
-    name_font_size = 13
+    name_font_size = 15
     name_avg_width = 0.56  # Helvetica-Bold, fraction of font size per char
-    detail_font_size = 7
+    detail_font_size = 8
 
     left_align_mid = layout.SimpleBoxLayoutRule(
         x_align=layout.AxisAlignment.ALIGN_MIN,
         y_align=layout.AxisAlignment.ALIGN_MID,
-        margins=layout.Margins(left=8, right=4, top=2, bottom=2),
+        margins=layout.Margins(left=6, right=6, top=2, bottom=2),
     )
 
     name_style = TextBoxStyle(
@@ -239,7 +239,10 @@ def _build_signature_stamp_style(signer_name: str):
                 b"Q",
             ]
 
-    return _TwoColumnStampStyle()
+    # No border — a hard rectangle around the stamp is what made it read as
+    # a "fake" pasted-on box; the reference appearance floats directly on
+    # the page, same as Adobe's own default signature look.
+    return _TwoColumnStampStyle(border_width=0)
 
 
 def begin_signature(
