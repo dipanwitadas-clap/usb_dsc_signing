@@ -201,8 +201,8 @@ def _build_signature_stamp_style(signer_name: str):
     )
 
     timestamp_date, timestamp_time = _adobe_style_timestamp()
-    left_fraction = 0.40
-    gap_fraction = 0.20
+    left_fraction = 0.45
+    gap_fraction = 0.10
 
     @dataclass(frozen=True)
     class _TwoColumnStampStyle(BaseStampStyle):
