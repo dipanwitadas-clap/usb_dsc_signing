@@ -238,7 +238,7 @@ def _build_signature_stamp_style(signer_name: str):
     timestamp_date, timestamp_time = _adobe_style_timestamp()
     max_name_fraction = 0.45  # cap on how wide the name is allowed to wrap
     name_left_margin = left_align_mid.margins.left
-    detail_gap = 14  # blank points between end of name text and details
+    detail_gap = 8  # blank points between end of name text and details
 
     @dataclass(frozen=True)
     class _TwoColumnStampStyle(BaseStampStyle):
