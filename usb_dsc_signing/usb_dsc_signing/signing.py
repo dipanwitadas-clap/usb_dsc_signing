@@ -208,7 +208,7 @@ def _build_signature_stamp_style(signer_name: str):
     from pyhanko.pdf_utils.text import TextBox, TextBoxStyle
     from pyhanko.stamp.base import BaseStamp, BaseStampStyle
 
-    name_font_size = 18
+    name_font_size = 16
     detail_font_size = 8
 
     left_align_mid = layout.SimpleBoxLayoutRule(
@@ -227,6 +227,12 @@ def _build_signature_stamp_style(signer_name: str):
         font_size=name_font_size,
         leading=name_font_size + 2,
         box_layout_rule=left_align_mid,
+        # Soft dark gray instead of pure black — some PDF viewers substitute
+        # a heavier system font for the standard "Helvetica" name, and even
+        # where they don't, solid black at this size reads as bold/heavy.
+        # Softening the fill color keeps it legible without the "heavy"
+        # look, with no font/dependency changes involved.
+        text_color=(0.35, 0.35, 0.35),
     )
     detail_style = TextBoxStyle(
         font=SimpleFontEngineFactory("Helvetica", 0.5),
