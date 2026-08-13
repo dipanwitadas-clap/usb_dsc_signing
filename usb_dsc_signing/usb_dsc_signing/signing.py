@@ -239,6 +239,14 @@ def _build_signature_stamp_style(signer_name: str):
     max_name_fraction = 0.45  # cap on how wide the name is allowed to wrap
     name_left_margin = left_align_mid.margins.left
     detail_gap = 8  # blank points between end of name text and details
+    # pyHanko's layout code hard-errors if a text box is narrower than its
+    # own left+right margins (6+6=12 here). A very long/unbreakable name in
+    # a narrow signature box (e.g. DSC Settings width still at the 200pt
+    # default) could otherwise push the details column down to a sliver —
+    # or negative — width and crash the whole signing request. Floor it
+    # comfortably above the margin requirement so that never happens; a
+    # tight-but-valid layout beats a hard failure.
+    min_column_width = 30
 
     @dataclass(frozen=True)
     class _TwoColumnStampStyle(BaseStampStyle):
@@ -248,7 +256,9 @@ def _build_signature_stamp_style(signer_name: str):
     class _TwoColumnStamp(BaseStamp):
         def _render_inner_content(self):
             bbox = self.box
-            max_name_width = int(bbox.width * max_name_fraction)
+            max_name_width = min(
+                max(int(bbox.width * max_name_fraction), min_column_width), bbox.width
+            )
 
             wrapped_name = _wrap_to_width(signer_name, max_name_width, name_font_size)
             # Gap is measured from the name's actual rendered width (real
@@ -262,7 +272,8 @@ def _build_signature_stamp_style(signer_name: str):
                 _text_width_pt(line, name_font_size) for line in wrapped_name.split("\n")
             )
             detail_x = int(name_left_margin + name_natural_width + detail_gap)
-            detail_width = max(bbox.width - detail_x, 1)
+            detail_x = max(0, min(detail_x, bbox.width - min_column_width))
+            detail_width = max(bbox.width - detail_x, min_column_width)
 
             name_box = TextBox(
                 name_style,
