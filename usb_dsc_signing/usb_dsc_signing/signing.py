@@ -232,7 +232,7 @@ def _build_signature_stamp_style(signer_name: str):
         # where they don't, solid black at this size reads as bold/heavy.
         # Softening the fill color keeps it legible without the "heavy"
         # look, with no font/dependency changes involved.
-        text_color=(0.40, 0.40, 0.40),
+        text_color=(0.28, 0.28, 0.28),
     )
     detail_style = TextBoxStyle(
         font=SimpleFontEngineFactory("Helvetica", 0.5),
